@@ -25,6 +25,8 @@
 #	only 1 instance of the plugin is required for all remote devices using that protocol
 #	and the units will appear there.
 #
+# there is nothing in this other than this comment as I dont actually know how to use git hub
+# and I am experimenting to see if I can push this or add it or whatever.
 
 
 import select
