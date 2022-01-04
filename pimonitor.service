@@ -1,0 +1,9 @@
+[Unit]
+Description=Raspberry Pi Health Monitor for XTension
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/pimonitor/pimonitor.py
+
+[Install]
+WantedBy=network.target
