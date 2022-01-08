@@ -1,9 +1,11 @@
 [Unit]
 Description=Raspberry Pi Health Monitor for XTension
-After=network.target
+Wants=multi-user.target
+After=multi-user.target
 
 [Service]
 ExecStart=/usr/bin/python3 /home/pi/pimonitor/pimonitor.py
+KillSignal=SIGINT
 
 [Install]
-WantedBy=network.target
+WantedBy=multi-user.target
