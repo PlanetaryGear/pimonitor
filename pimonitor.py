@@ -10,36 +10,69 @@
 #	turned on as long as this program is running alerting you to a pi that has gone offline
 #	or having other problems.
 #
-#	
-#	note that the install procedure below assumes you have placed the file into the
-#	standard pi home directory. If you have installed it elsewhere or changed names
-#	you will have to edit the file accordingly
+#	XTENSION INSTALL:
+#		on the XTension side this requires that you be running an instance of the "XTension Kits"
+#		plugin. Only 1 instance is necessary for all devices on the local network that implement the
+#		protocol. 
 #
-#	to install copy the pimonitor.service file into the systemctl folder like:
-#		sudo cp /home/pi/pimonitor/pimonitor.service /lib/systemd/system/
-#		sudo systemctl daemon-reload
-#		sudo systemctl enable pimonitor
-#		sudo systemctl start pimonitor
+# 	INSTALL:
+#		1) copy or rename the configuration_template.py file to "configuration.py"
+#			cp configuration_template.py configuration.py
 #
-#	or just reboot to start the process. In XTension run an XTension Kits Receiver plugin
-#	only 1 instance of the plugin is required for all remote devices using that protocol
-#	and the units will appear there.
+#		2) edit the configuration file to include the things you wish to scan and the intervals
+#			descriptions of the various options are included in the configuration.py file
+#			nano ./configuration.py
 #
-# there is nothing in this other than this comment as I dont actually know how to use git hub
-# and I am experimenting to see if I can push this or add it or whatever.
+#		3) install the systemctl files
+#			The service file assumes that the program was installed in /home/pi/pimonitor
+#			if you have installed the file in a different place please edit the file to point
+#			to the new install location.
+#
+#			sudo cp /home/pi/pimonitor/pimonitor.service /lib/systemd/system/
+#			sudo systemctl daemon-reload
+#			sudo systemctl enable pimonitor
+#			sudo systemctl start pimonitor
+#
 
 
 import select
 import datetime
-import sys
+import sys, os
 import threading
 from subprocess import PIPE, Popen
 
 
-currentHostname = None 				# will become either the machine hostname or was set by the user in configuration file
 from xtension import *				# XTension plugin communication protocol support
 from xtension_constants import *	# Constants used in the commands to XTension
-from configuration import *			# user configuration 
+
+
+currentHostname 	= None 				# will become either the machine hostname or was set by the user in configuration file
+overrideDeviceId 	= None
+
+try:
+	from configuration import *			# user configuration 
+except:
+
+	# if they failed to copy the template file and make any changes then we can just use the defaults from the template file
+	try:
+		from configuration_template import *
+	except:
+		# if we cant find that either then strange things are afoot try to log it and then just sleep
+		xtension = XTension( deviceName="misconfigured pimonitor")
+		xtension.startup()
+	
+		sleep( 2)
+		errMsg = "Unable to find the configuration.py file, did you remember to rename the template file?"
+		print( errMsg)
+		xtension.writeLog( errMsg)
+		while True:
+			# just keep the systemctl from restarting us over and over and over
+			# so sit here and sleep and wait to be restarted by the user then there is
+			# some configuration to use
+			sleep( 1)
+
+
+
 
 
 
@@ -59,6 +92,9 @@ addrTXPower 			= 'TXPOWER'
 addrWiFiFreq			= 'WFREQ'
 addrCPUUsage 			= 'IDLE'
 addrFrequency 			= 'FREQ'
+addrDiskSpace 			= 'SPACE'
+	# disk space will be the 'SPACE.' and then the path with all the slashes converted to more periods
+	# so the root would be 'SPACE..' and /pi/recordings would be SPACE.PI.RECORDINGS
 
 
 
@@ -69,23 +105,18 @@ addrFrequency 			= 'FREQ'
 throttledFile = None
 CPUFreqFile = None
 
-
+# current values so we can only send info when something has changed
 currentCPUTemp 		= 0.0
-currentRSSI 		= []
-currentQuality 		= []
-currentBitRate 		= []
-currentTXPower 		= []
-currentWiFiFrequency= []
+currentRSSI 		= [0] * len( RSSIInterfaceName)
+currentQuality 		= [0] * len( RSSIInterfaceName)
+currentBitRate 		= [0] * len( RSSIInterfaceName)
+currentTXPower 		= [0] * len( RSSIInterfaceName)
+currentWiFiFrequency= [0] * len( RSSIInterfaceName)
 currentUsageData	= None
 currentCPUUsage	 	= -1
 currentCPUFreq 		= 0
+currentDiskSpace 	= [0] * len( volumesToScan)
 
-for s in RSSIInterfaceName:	# make sure we have a previous value for each wireless lan interface
-	currentRSSI.append( 0)
-	currentQuality.append( 0)
-	currentBitRate.append( 0)
-	currentTXPower.append( 0)
-	currentWiFiFrequency.append( 0)
 	
 
 
@@ -109,6 +140,7 @@ def threadedFileWatcher():
 	CPUCheckCounter 	= CPUTempScanSeconds
 	RSSICheckCounter 	= RSSIScanSeconds
 	CPUUsageCounter 	= CPUUsageScanSeconds
+	diskSpaceCounter 	= diskScanSeconds
 	
 	try:
 		throttledFile = open( "/sys/devices/platform/soc/soc:firmware/get_throttled")
@@ -121,13 +153,17 @@ def threadedFileWatcher():
 	
 
 	while True:
-		skipOtherPolls = False # when the epoll.poll returns something it may be much faster than we want to count other seconds			
+		skipOtherPolls = False # when the epoll.poll returns something it may be much faster than we want to count other seconds	
 		for fd, event in epoll.poll( 1):
-			print( " -- fd=%s event=%s" % (fd, event))
+			#print( " -- fd=%s event=%s" % (fd, event))
 			skipOtherPolls = True
 
 			if throttledFile != None and fd == throttledFile.fileno():
-				processThrottledFile()
+				try:
+					processThrottledFile()
+				except Exception as e:
+					xtension.writeLog( "ERROR: processThrottledFile( %s)" % e)
+					
 
 		if skipOtherPolls:
 			continue
@@ -135,14 +171,23 @@ def threadedFileWatcher():
 		if checkCPUTemp:
 			CPUCheckCounter += 1
 			if CPUCheckCounter >= CPUTempScanSeconds:
-				processCPUTemp()
+				try:
+					processCPUTemp()
+				except Exception as e:
+					xtension.writeLog( "ERROR: processCPUTemp( %s)" % e)
+					
 				CPUCheckCounter = 0
 		
 		
 		if checkRSSI:
 			RSSICheckCounter += 1
 			if RSSICheckCounter >= RSSIScanSeconds:
-				processRSSI()
+				try:
+					processRSSI()
+				except Exception as e:
+					xtension.writeLog( "ERROR: processRSSI( %s)" % e)
+					
+					
 				RSSICheckCounter = 0
 		
 		
@@ -150,59 +195,29 @@ def threadedFileWatcher():
 		if checkCPUUsage:
 			CPUUsageCounter += 1
 			if CPUUsageCounter >= CPUUsageScanSeconds:
-				processCPUUsage()
+				try:
+					processCPUUsage()
+				except Exception as e:
+					xtension.writeLog( "ERROR: processCPUUsage( %s)" % e)
+					
 				CPUUsageCounter = 0
+		
+		
+		if checkDiskSpace:
+			diskSpaceCounter += 1
+			if diskSpaceCounter >= diskScanSeconds:
+				try:
+					processDiskSpace()
+				except Exception as e:
+					xtension.writeLog( "ERROR: processDiskSpace( %s)" % e)
+					
+				diskSpaceCounter = 0
 					
 
 
 	if throtteledFile != None:
 		epoll.unregisterFile( throttledFile.fileno())
 		throttledFile.close()
-	
-
-
-#
-#	not everything works to see a change like the throttled file
-#	so some must just be checked at intervals
-#
-# def nonSelectFileThread():
-# 
-# 	# Force to run after one second to prime the pump
-# 	CPUCheckCounter 	= CPUTempScanSeconds
-# 	RSSICheckCounter 	= RSSIScanSeconds
-# 	CPUUsageCounter 	= CPUUsageScanSeconds
-# 
-# 	while True:
-# 		sleep( 1)
-# 		
-# 		# do this every second
-# 		# processCPUFreqFile()
-# 		
-# 		if checkCPUTemp:
-# 			CPUCheckCounter += 1
-# 			if CPUCheckCounter >= CPUTempScanSeconds:
-# 				processCPUTemp()
-# 				CPUCheckCounter = 0
-# 		
-# 		
-# 		if checkRSSI:
-# 			RSSICheckCounter += 1
-# 			if RSSICheckCounter >= RSSIScanSeconds:
-# 				processRSSI()
-# 				RSSICheckCounter = 0
-# 		
-# 		
-# 		
-# 		if checkCPUUsage:
-# 			CPUUsageCounter += 1
-# 			if CPUUsageCounter >= CPUUsageScanSeconds:
-# 				processCPUUsage()
-# 				CPUUsageCounter = 0
-# 			
-			
-		
-
-
 	
 	
 	
@@ -497,6 +512,37 @@ def processCPUUsage():
 		xtension.sendValue( value=newIdle, tag=xtension.tagRegister, address=addrCPUUsage)
 
 
+# 	function formatBytes(a,b){if(0==a)return"0 Bytes";var c=1024,d=b||2,e=["Bytes","KB","MB","GB","TB","PB","EB","ZB","YB"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(d))+" "+e[f]}
+
+def humanReadableSize( size, decimalPlaces = 2):
+	for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
+		if size < 1024.0 or unit == 'PB':
+			break
+		size /= 1024.0
+	
+	formatString = '{:.%sf} {}' % decimalPlaces	
+	return formatString.format( size, unit)
+
+def processDiskSpace():
+	global currentDiskSpace
+	
+	for i in range( len( volumesToScan)):
+		try:
+			thisPath = volumesToScan[ i]
+			thisAddress = addrDiskSpace + '.' + thisPath.replace( '/', '.')
+			diskInfo = os.statvfs( thisPath)
+			thisSpace = diskInfo.f_bavail * diskInfo.f_frsize
+			
+			if thisSpace != currentDiskSpace[ i]:
+				currentDiskSpace[ i] = thisSpace
+				xtension.sendValue( value=thisSpace, tag=xtension.tagRegister, address=thisAddress,
+					xtKeyDefaultLabel=humanReadableSize( thisSpace), xtKeyUpdateOnly=True)
+
+		except Exception as e:
+			xtension.writeLog( 'Unable to get disk space for volume at "%s" %s' % (thisPath, e))
+			
+		
+		
 
 
 
@@ -510,6 +556,17 @@ def readHostnameInline():
 		
 	currentHostname = file.read().strip()
 	file.close
+	
+def getPiType():
+	try:
+		with open( '/proc/device-tree/model') as f:
+			boardName = f.read().strip()
+			
+		
+		return boardName
+	except:
+		return '(unknown pi type)'
+	
 
 
 def getInfoForXTension():
@@ -589,46 +646,35 @@ def getInfoForXTension():
 	if checkCPUFrequency:
 		units += [{kInfoName:'CPU Frequency', kInfoTag:xtension.tagRegister, kInfoAddress:addrFrequency, 
 			kInfoDimmable:True,	kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoSuffix:' MHz'}]
+			
+	if checkDiskSpace:
+		for thisPath in volumesToScan:
+			thisAddress = addrDiskSpace + '.' + thisPath.replace( '/', '.')
+			units += [{kInfoName:'Disk Space: %s' % thisPath, kInfoTag:xtension.tagRegister, 
+				kInfoAddress:thisAddress, kInfoDimmable:True, kInfoReceiveOnly:True, kInfoIgnoreClicks:True}]
+				
+				
 
 	
 	work[ 'units'] = units
 	
+	# additional properties for the master unit
+	work[ 'mainprops'] = [
+		{'pi type':piType}
+	]
+	
 	return work
 	
-	
 
-
-
-def ParseThrottleStatus(status):
-	StatusStr = ""
-
-	if (status == 0):
-		StatusStr += "No Problems"
-
-	if (status & 0x40000):
-		StatusStr += "Throttling has occured. "
-	if (status & 0x20000):
-		StatusStr += "ARM freqency capping has occured. "
-	if (status & 0x10000):
-		StatusStr += "Undervoltage has occured. "
-	if (status & 0x4):
-		StatusStr += "Active throttling. "
-	if (status & 0x2):
-		StatusStr += "Active ARM frequency capped. "
-	if (status & 0x1):
-		StatusStr += "Active undervoltage. "
-
-	return StatusStr
-
-
-
-print( "begin")
 
 # if the user has not set it then we will do so from the machine hostname
+
 if currentHostname == None:
 	readHostnameInline()
 
-xtension = XTension( deviceName=currentHostname)
+piType = getPiType()
+
+xtension = XTension( deviceName=currentHostname, deviceId=overrideDeviceId)
 xtension.callbackGetInfo = getInfoForXTension
 
 xtension.startup()

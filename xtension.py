@@ -16,8 +16,8 @@
 #
 
 import json
+import os
 from socket import *
-from uuid import getnode
 from threading import *
 from time import *
 import atexit
@@ -52,6 +52,7 @@ class XTension( object):
 	#	this is just trapping the atexit callback but makes it unnecessary to link that into
 	#	the main app linking in this code
 	callbackHandleShutdown = None
+	shuttingDown = False # will be set to true when we are shutting down so that we can try to avoid sending any more packets after that point
 
 	# constants for known device types you can create in XTension
 	
@@ -68,7 +69,6 @@ class XTension( object):
 	# as well as any of the above units for it's capabilities. This is where the device level
 	# settings should be created.
 	
-	#tagRainbowHat		= 'xt.rainbowhat'		# the pimoroni rainbow hat for the raspberry pi
 	# just use a generic one where we describe our units in the sendInfo packet
 	#
 	
@@ -124,10 +124,10 @@ class XTension( object):
 	#	to create the units and reference the device.
 	#
 	#	usage:
-	#	xtension = XTension( deviceName='lab rainbow hat')
+	#	xtension = XTension( deviceName='lab rainbow hat', deviceID='EA1234')
 	#
 	
-	def __init__( self, *, deviceClass='xt.generic', deviceName='unnamed'):
+	def __init__( self, *, deviceClass='xt.generic', deviceName='unnamed', deviceId=None):
 	
 		# store off a local global (is that even a thing?) so that other classes can access
 		# the data and methods in this class, not just in the importing files that will create
@@ -152,8 +152,14 @@ class XTension( object):
 		self.udpListener = None
 		
 		# unique is 6 bytes in hex of the lower 3 bytes of our MAC address
-		self.uniqueId = hex( getnode() & 16777215).upper()[2:] # also strip off the 0X at the beginning of the hex output
-		print( "this pi's uniqueid is: %s" % self.uniqueId)
+		#self.uniqueId = hex( getnode() & 16777215).upper()[2:] # also strip off the 0X at the beginning of the hex output
+		#print( "this pi's uniqueid is: %s" % self.uniqueId)
+		if deviceId == None:
+			self.uniqueId = self.makeUniqueId()
+		else:
+			self.uniqueId = deviceId
+		
+		#print( "unique id is: %s" % self.uniqueId)
 		
 		# we can be connected to as many as 4 XTension instances so we need an array to hold those
 		# data classes that describe them
@@ -163,6 +169,53 @@ class XTension( object):
 		# counter so that we can send our announce packet every few minutes
 		self.announceInterval = 120
 		self.announceCounter = self.announceInterval # so it runs on the first loop iteration
+
+	#
+	#	M A K E   U N I Q U E   I D
+	#	
+	#	XTension needs to see us with a unique ID this is normally derived from the MAC address
+	#	but that gets more complicated here as we don't want more dependencies and yet the UUID 
+	#	call to getnode() is not a good way to do this as it changes with each reboot! So rater than
+	#	try to save it and restore it we will look in the file system at /sys/class/net where the folders
+	#	for eth0 and wlan0 exist and see if we can find one of them. Those folder may be named something else
+	#	if you are using the newer unique interface names so we must walk those folders and find one that
+	#	has a MAC address and that isn't lo.
+	#
+	
+	def makeUniqueId( self):
+		pathToNetFolder = '/sys/class/net'
+		addressFileName = 'address'
+		rawMacAddress = None
+		 # preload this list with these and then add on any that arent these that we find
+		 # that way we prefer the eth0 and then the wlan0 interfaces but if they arent there
+		 # we will get to the other custom named interfaces that may be there.
+		interfaceFolders = ['eth0', 'wlan0']
+		# get all the folders inside the interface folder
+		for root, dirs, files in os.walk( pathToNetFolder):
+			# not assuming that the folders will always come in the same order sort them
+			dirs.sort()
+			for f in dirs:
+				if not f in interfaceFolders:
+					interfaceFolders.append( f)
+		# walk the interface folders until we find one with a valid
+		for workFolder in interfaceFolders:
+			pathToAddress = pathToNetFolder + '/' + workFolder + '/' + addressFileName
+			if not os.path.exists( pathToAddress):
+				continue
+			with open( pathToAddress) as f:
+				thisMAC = f.read().strip()
+			if thisMAC == '00:00:00:00:00:00':
+				# this is the local loopback or other disabled interface so ignore
+				continue
+			rawMacAddress = thisMAC
+			#print( "loading from %s %s" % (workFolder, thisMAC))
+			break
+		# if we didnt find anything then send an error one
+		if rawMacAddress == None:
+			return '123456'
+		else:
+			return ''.join( rawMacAddress.split( ':')[ 3:]).upper()
+			
 
 
 	#
@@ -443,7 +496,7 @@ class XTension( object):
 				# we need to create an instance and insert it into the 
 				# list
 				
-				print( "adding instance for XTension at: %s with ID %s" % (p.address, p.senderId))
+				#print( "adding instance for XTension at: %s with ID %s" % (p.address, p.senderId))
 				
 				workInstance = XTInstance( address=p.address, uniqueId=p.senderId)
 				
@@ -455,7 +508,7 @@ class XTension( object):
 				# if it is the bye bye command then we remove the instance of XTension
 				# and stop processing here
 				if p.command == self.xtPCommandByeBye:
-					print( "ByeBye from XTension %s" % p.senderId)
+					#print( "ByeBye from XTension %s" % p.senderId)
 					self.removeInstance( instance=workInstance)
 					return
 			
@@ -519,6 +572,11 @@ class XTension( object):
 	#	port is optional, if not there we will use the self.udpPort value
 	#
 	def sendCommand( self,*, instance, command):
+		
+		if self.shuttingDown:
+			#print( "returning direct without sending")
+			return
+	
 		if self.udpSocket == None:
 			self.udpSocket = socket( AF_INET, SOCK_DGRAM)
 			self.udpSocket.setsockopt( SOL_SOCKET, SO_REUSEADDR, 1)
@@ -530,14 +588,35 @@ class XTension( object):
 		
 		command.targetId = instance.uniqueId
 		#print( "sending command (%s) to (%s, %s)" % (command.getRawData(), instance.address, instance.port))
-						
-		self.udpSocket.sendto( command.getRawData(), (instance.address, instance.port))
+		
+		# it is possible that a network being down would make this error or if we manage to come up
+		# before the wifi is connected so we should sleep a moment and then retry
+		
+		retryCount = 0
+		
+		while retryCount < 5:
+			try:		
+				self.udpSocket.sendto( command.getRawData(), (instance.address, instance.port))
+				break
+			except:
+				retryCount +=1
+				sleep( 2)
 			
 
 	#
 	#	S E N D   B R O A D C A S T   C O M M A N D
 	#
 	def sendBroadcastCommand( self, command, *, address=None, port=None):
+		
+		# once we have sent the bye bye command no other command should be sent
+		if self.shuttingDown:
+			#print( "returning without sending")
+			return
+			
+		if command.command == self.xtPCommandByeBye:
+			self.shuttingDown = True
+			
+		
 		if self.udpBroadcastSocket == None:
 			self.udpBroadcastSocket = socket( AF_INET, SOCK_DGRAM)
 			self.udpBroadcastSocket.setsockopt( SOL_SOCKET, SO_REUSEADDR, 1)
@@ -550,7 +629,16 @@ class XTension( object):
 			port = self.udpPort
 			
 		
-		self.udpBroadcastSocket.sendto( command.getRawData(), (address, port))
+		retryCount = 0
+		
+		while retryCount < 5:
+			try:
+				self.udpBroadcastSocket.sendto( command.getRawData(), (address, port))
+				break
+			except:
+				retryCount += 1
+				sleep( 2)
+			
 		
 			
 			
@@ -561,6 +649,10 @@ class XTension( object):
 	#	packet delimiters in the string being sent
 	#
 	def writeLog( self, theData):
+		# do not send any more commands after we are being shut down
+		if self.shuttingDown:
+			return
+
 	
 		self.sendCommandToAll( XTPCommand(	command=self.xtPCommandLog, data=[ theData]))
 	
@@ -581,6 +673,10 @@ class XTension( object):
 	#
 	
 	def sendAck( self, theCommand):
+		# do not send any more commands after we are being shut down
+		if self.shuttingDown:
+			return
+
 		# get our xtension instance so that we can send the command back
 		workInstance = self.getInstance( theCommand.senderId)
 		
@@ -639,6 +735,10 @@ class XTension( object):
 	#	via other keywords to the call
 	#
 	def sendOn( self, *, address, tag, **kwargs):
+		# do not send any more commands after we are being shut down
+		if self.shuttingDown:
+			return
+
 		data = {xtKeyCommand:xtCommandOn, xtKeyTag:tag, xtKeyAddress:address}
 		# add in any optional info sent to the command
 		# expanding any global constants that you used as keys
@@ -661,6 +761,10 @@ class XTension( object):
 	#	via other keyed parameters to the call
 	#
 	def sendOff( self, *, address, tag, **kwargs):
+		# do not send any more commands after we are being shut down
+		if self.shuttingDown:
+			return
+			
 		data = {xtKeyCommand:xtCommandOff, xtKeyTag:tag, xtKeyAddress:address}
 		
 		for key in kwargs:
@@ -680,6 +784,11 @@ class XTension( object):
 	#	parameters that should go into the command such as xtKeyUpdateOnly
 	#
 	def sendValue( self, *, address, tag, value, **kwargs):
+
+		# do not send any more commands after we are being shut down
+		if self.shuttingDown:
+			return
+			
 		data = {xtKeyCommand:xtCommandSetValue, xtKeyTag:tag, xtKeyAddress:address, xtKeyValue:value}
 		
 		for key in kwargs:
