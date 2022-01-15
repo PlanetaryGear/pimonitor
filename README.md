@@ -72,7 +72,7 @@ with each boot of the Pi.
 
 
 ## Units Created In XTension:
-![XTension Units Screenshot](/assets/images/pimonitor-xtension-units.png)
+![XTension Units Screenshot](/pimonitor-xtension-units.png)
 
 - **Status Unit:** The first unit created shows the online/offline status of the pi. If the program is quit normally via a reboot or other shutdown this will turn off
 and show a label of offline. If the pi hangs or drops off the network for more than 4 minutes the unit will timeout and switch to offline as well.
@@ -120,28 +120,25 @@ To edit the configuration file from the `/home/pi/pimonitor` folder use nano or 
 **Note that the configuration names are case sensitive. Booleans are case sensitive as well and must be "True" or "False". Just "true" or "false" will generate
 an error upon loading the configuration file.**
 
-### Override Hostname
-By default the hostname of the device is used to name the units created in XTension. If you wish to use a different, or more descriptive name
-for the unit name prefix in XTension you can uncomment this line and enter any reasonable string to use instead.
+- **Override Hostname:** By default the hostname of the device is used to name the units created in XTension. If you wish to use a different, or more descriptive name for the unit name prefix in XTension you can uncomment this line and enter any reasonable string to use instead.
+  - ```overrideHostname = "A More Descriptive Name Here"```
 
-```overrideHostname = "A More Descriptive Name Here"```
-
-### Override Device ID
+- **Override Device ID:**
 Every unit in XTension must have a unique ID or Address. By default the MAC address of the Pi is used to create a unique 6 character hex string that is appended
 to the other info to create a unique address for each data point and each pi that you are monitoring. If you replace one pi with another or if you replace
 one network adaptor with another you may wish to keep the previous ID so that the current units in XTension are used rather than new units being created
 with the new address. If so uncomment this line and enter the previous id. Note that the IDs are not case sensitive but will be converted to all upper case 
 by XTension.
 
-```overrideDeviceId = "123456" # the id of the previously used pi```
+  - ```overrideDeviceId = "123456" # the id of the previously used pi```
 
-### Show Temps In F
+- **Show Temps In F:**
 Change to True in order to display the temperature
 in °F rather than °C. But before you decide to display in F see the next option which will let you see it in both formats in XTension.
 
-```showTempsInF = False```
+  - ```showTempsInF = False```
 
-### Also Show In Other Scale
+- **Also Show In Other Scale:**
 I find it useful to see the temperatures in °C as the published infor for when the Pi starts temperature throttling is published in C. So I know as it aproaches
 80°C I'm in potential trouble. However being from America I don't think in Celcius so to have an idea of what the temperature really is I like to also see it in 
 F. If this option is turned on then the actual value of the Unit in XTension will be set to the format you have chosen in the previous option, but the label
@@ -149,102 +146,100 @@ displayed in any value column in XTension or the web interfaces will include the
 set to true the value of the Unit will be in C, but the label of the value will show "53°C (127.4°F)" or if showTempsInF is set to True then the label will be
 "127.4°F (53°C)"
 
-```alsoShowInOtherScale = True```
+  - ```alsoShowInOtherScale = True```
 
-### Check CPU Temp
+- **Check CPU Temp:**
 Set to false if you do not wish to regularly check the CPU temperature.
 
-```checkCPUTemp = True```
+  - ```checkCPUTemp = True```
 
-### CPU Temp Scan Seconds
+- **CPU Temp Scan Seconds:**
 How often do you wish to check the CPU temperature. This must be an integer value of the seconds between checks of the CPU temp. An update to XTension is only
 sent if the new value read is different from the previously sent value so you will not necessarily be receiving an update in XTension this often.
 
-```CPUTempScanSeconds = 10```
+  - ```CPUTempScanSeconds = 10```
 
-### RSSI Interface Name
+- **RSSI Interface Name:**
 If you are using WiFi to connect the Pi it can be useful to watch the RSSI and link quality to look for changes. This value is a Python list and can include any
 number of wifi interfaces that support getting this information. If you have enabled the unique interface names then you may have to edit this name
 to be the unique name it assigns to your wifi interface. If you are using the default interface naming conventions and have only a single
-WiFi interface then the default will likely work as is. 
+WiFi interface then the default will likely work as is. If you are using Ethernet or do not wish to scan the WiFi set this to an empty list like `[]`
 
-If you are using Ethernet or do not wish to scan the WiFi set this to an empty list like `[]`
+  - ```RSSIInterfaceName = ['wlan0'] # scan just the default interface```
+  - ```RSSIInterfaceName = [] # do not scan any interfaces```
+  - ```RSSIInterfaceName = ['wlan0', 'wlan1', 'wlan2'] # scan 3 different wifi interfaces```
 
-```RSSIInterfaceName = ['wlan0']```
 
-An example of not scanning any wifi interfaces: ```RSSIInterfaceName = []```
-An example of scanning multiple interfaces: ```RSSIInterfaceName = ['wlan0', 'wlan1', 'wlan2']```
-
-### RSSI Scan Seconds
+- **RSSI Scan Seconds:**
 How often in seconds to scan the WiFi information. This must be an integer. Only values that have changed since the last scan are sent as updates to their units
 in XTension.
 
-```RSSIScanSeconds = 10```
+  - ```RSSIScanSeconds = 10```
 
-### Check RSSI
+- **Check RSSI:**
 If you do not wish to create a unit for the RSSI value set this to False. The other values, if any, that are enabled will still be scanned.
 
-```checkRSSI = True```
+  - ```checkRSSI = True```
 
-### Show Bit Rate
+- **Show Bit Rate:**
 If you do not wish to create a unit for the Bit Rate of the interface set this to False. 
 
-```showBitRate = True```
+  - ```showBitRate = True```
 
-### Show TX Power
+- **Show TX Power:**
 If you do not wish to create a unit for the transmit power being used set this to False.
 
-```showTXPower = True```
+  - ```showTXPower = True```
 
-### Show Link Quality
+- **Show Link Quality:**
 The link quality is a percentage and is very useful for tracking issues as it is easy to see and immediately understand unlike the RSSI value.
 
-```showLinkQuality = True```
+  - ```showLinkQuality = True```
 
-### Show Wifi Frequency
+- **Show Wifi Frequency:**
 This can show you what channel is being used to connect and therefore which access point it is connected to, though this may change from the Access Point
 randomly as well. 
 
-```showWiFiFrequency = True```
+  - ```showWiFiFrequency = True```
 
-### Check CPU Usage
+- **Check CPU Usage:**
 Set to false if you do not wish to scan the CPU usage. This is the percent of the time the CPU is idle. So a reading of 100% is a CPU that is doing practically nothing.
 
-```checkCPUUsage = True```
+  - ```checkCPUUsage = True```
 
-### CPU Usage Scan Seconds
+- **CPU Usage Scan Seconds:**
 How often in seconds you wish to scan the CPU Usage
 
-```CPUUsageScanSeconds = 10```
+  - ```CPUUsageScanSeconds = 10```
 
-### Check CPU Frequency
+- **Check CPU Frequency:**
 Set to True if you wish to also watch the CPU speed change. This can change very rapidly generating a lot of traffic and potentially load in XTension. Since this
 has to be a regular check and cannot be triggered by an event when the speed changes you may miss very rapid changes as well. In XTension and XTdb the limit for
 saving data is one value a second and this can change much more rapidly than that so quick changes may not register properly in the database and graph displays. Use
 for debugging purposes if necessary but disabled by default.
 
-```checkCPUFrequency = False```
+  - ```checkCPUFrequency = False```
 
-### CPU Frequency Scan Seconds
+- **CPU Frequency Scan Seconds:**
 See the above for discussion about this. Unlike all the other scan intervals this is a float value of seconds so you can scan the CPU speed much faster than the
 other values. Setting it too fast will cause the process to use a lot more CPU and it may still miss quick bumbs in CPU speed.
 
-```CPUFrequencyScanSeconds = 0.2```
+  - ```CPUFrequencyScanSeconds = 0.2```
 
-### Check Disk Space
+- **Check Disk Space:**
 Any number of mount points can be checked for available space on a regular basis as well. The value sent to the Unit in XTension will be the number of k that is available
 on the drive. The label in XTension will be a more human readable version like "45 MB" or "6.5 GB.
 
-```checkDiskSpace = True```
+  - ```checkDiskSpace = True```
 
-### Disk Scan Seconds
+- **Disk Scan Seconds:**
 How often in seconds do you wish to scan the drives for changes in usage. This must be an integer number of seconds.
 
-```diskScanSeconds = 60```
+  - ```diskScanSeconds = 60```
 
-### Volumes To Scan
+- **Volumes To Scan:**
 This is a python list of the mount points that you wish to scan. By default only the root volume is scanned but if you have configured other mount points they
 can be added to this list. See the RSSIInterfaceName entry above for more info on making syntactically correct python lists.
 
-```volumesToScan = ['/']```
+  - ```volumesToScan = ['/']```
 
