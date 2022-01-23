@@ -50,11 +50,13 @@ from xtension import *				# XTension plugin communication protocol support
 from xtension_constants import *	# Constants used in the commands to XTension
 
 
-currentHostname 	= None 				# will become either the machine hostname or was set by the user in configuration file
-overrideDeviceId 	= None
+currentHostname 	= None 			# will become either the machine hostname or was set by the user in configuration file
+overrideDeviceId 	= None 			# see this value in the configuration file for more info
 
+# import the configuration data
+# if the configuration.py file is not found attempt to import the default values from the template file
 try:
-	from configuration import *			# user configuration 
+	from configuration import *		# user configuration 
 except:
 
 	# if they failed to copy the template file and make any changes then we can just use the defaults from the template file
@@ -160,7 +162,6 @@ def threadedFileWatcher():
 	while True:
 		skipOtherPolls = False # when the epoll.poll returns something it may be much faster than we want to count other seconds	
 		for fd, event in epoll.poll( 1):
-			#print( " -- fd=%s event=%s" % (fd, event))
 			skipOtherPolls = True
 
 			if throttledFile != None and fd == throttledFile.fileno():
@@ -255,7 +256,7 @@ def processRSSI():
 				if value != currentWiFiFrequency[ i]:
 					currentWiFiFrequency[ i] = value
 					thisAddress = addrWiFiFreq + '.' + thisName
-					print( "%s Freq: %s" % ( thisAddress, value))
+					#print( "%s Freq: %s" % ( thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 			
 			if checkRSSI and 'Signal level=' in workLine:
@@ -264,7 +265,7 @@ def processRSSI():
 				if value != currentRSSI[ i]:
 					thisAddress = addrRSSI + '.' + thisName
 					currentRSSI[ i] = value
-					print( "%s RSSI: %s" % (thisAddress, value))
+					#print( "%s RSSI: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 					
 			if showBitRate and 'Bit Rate=' in workLine:
@@ -273,7 +274,7 @@ def processRSSI():
 				if value != currentBitRate[ i]:
 					thisAddress = addrLinkRate + '.' + thisName
 					currentBitRate[ i] = value
-					print( "%s BitRate: %s" % (thisAddress, value))
+					#print( "%s BitRate: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 					
 			if showTXPower and 'Tx-Power=' in workLine:
@@ -282,7 +283,7 @@ def processRSSI():
 				if value != currentTXPower[ i]:
 					currentTXPower[ i] = value
 					thisAddress = addrTXPower + '.' + thisName
-					print( "%s TX Power: %s" % (thisAddress, value))
+					#print( "%s TX Power: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 					
 			if showLinkQuality and 'Link Quality=' in workLine:
@@ -292,7 +293,7 @@ def processRSSI():
 				if value != currentQuality[ i]:
 					currentQuality[ i] = value
 					thisAddress = addrLinkQuality + '.' + thisName
-					print( "%s Quality: %s" % (thisAddress, value))
+					#print( "%s Quality: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 			
 				
@@ -317,7 +318,7 @@ def processCPUTemp():
 	tempInF = CtoF( tempInC)
 	
 		
-	if showTempsinF:
+	if showTempsInF:
 		displayTemp = tempInF
 		augTemp = tempInC
 		primarySuffix = '°F'
@@ -329,7 +330,7 @@ def processCPUTemp():
 		secondarySuffix = '°F'
 
 
-	print( "CPU: %s" % displayTemp)
+	#print( "CPU: %s" % displayTemp)
 	
 	if displayTemp != currentCPUTemp:
 		currentCPUTemp = displayTemp
@@ -381,7 +382,6 @@ def processCPUFreqFile():
 	
 			if newFreq != currentCPUFreq:
 				currentCPUFreq = newFreq	
-				print( "CPU Freq: %s" % newFreq)
 				xtension.sendValue( value=newFreq, tag=xtension.tagRegister, address=addrFrequency, xtKeyUpdateOnly=True)
 		except Exception as e:
 			# basically ifgnore any errors as the file will be changing sometimes
@@ -479,6 +479,9 @@ def processThrottledFile():
 
 
 
+#
+#	P R O C E S S   C P U   U S A G E
+#
 
 def processCPUUsage():
 	global currentUsageData
@@ -486,8 +489,6 @@ def processCPUUsage():
 	
 	with open( '/proc/stat') as f:
 		rawValues = f.read().strip().split( '\n')[0]
-		
-	#print( "RAW (%s)" % rawValues)
 	
 	x = rawValues.split()
 	data = {'user':int( x[1]), 'nice':int( x[2]), 'system':int( x[3]), 
@@ -500,7 +501,6 @@ def processCPUUsage():
 	data[ 'total'] = data[ 'idle_total'] + data[ 'non_idle']
 
 	# if we are running the first time then just save off the data and look again at whatever interval
-	
 	if currentUsageData == None:
 		currentUsageData = data
 		return
