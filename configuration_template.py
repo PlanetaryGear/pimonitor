@@ -93,8 +93,8 @@ showWiFiFrequency = True
 #
 # Will create a unit with the CPU Idle percent in it. The first calculation will be after the
 # interval is first passed as it has to have a starting point from which to calculate from.
-checkCPUUsage 			= True
-CPUUsageScanSeconds 	= 10
+checkCPUUsage = True
+CPUUsageScanSeconds = 10
 
 
 #
@@ -104,7 +104,7 @@ CPUUsageScanSeconds 	= 10
 # fastest pi will throttle back when it's mostly idle. While you can set the speed to be very fast to catch
 # rapid changes that can occur in the course of normal operation keep in mind the XTdb will not record values
 # faster than once a second so it may not be useful to scan faster than that unless you want to 
-checkCPUFrequency 		= False
+checkCPUFrequency = False
 CPUFrequencyScanSeconds	= 0.2
 
 #
@@ -119,9 +119,9 @@ CPUFrequencyScanSeconds	= 0.2
 # if you wish to display the actual value in the XTension Unit you can override the default
 # label by editing the unit in XTension, visiting the Display tab and creating an On Label 
 # something like "<value>" to force it to ignore the default and use yours.
-checkDiskSpace 			= True
-diskScanSeconds 		= 60
-volumesToScan 			= ['/']
+checkDiskSpace = True
+diskScanSeconds = 60
+volumesToScan = ['/']
 
 
 
