@@ -25,6 +25,10 @@ From your home directory at `/home/pi` run the following:
 
 ```git clone https://github.com/PlanetaryGear/pimonitor.git```
 
+To update a current install to the latest commit enter the pimonitor directory and enter:
+
+```git pull```
+
 
 ### Installing via curl:
 To download the files as a zip file use the "Download Zip" option in the header of the main page above, or use curl from your command line. 
