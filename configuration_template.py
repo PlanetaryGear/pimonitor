@@ -34,9 +34,9 @@ alsoShowInOtherScale	= True 		# if true then the C or F value, whichever is the 
 									# in the value string for the unit, but the numeric value 
 									# for the unit will still be the one you selected above. 
 									# For example without this the display will be
-									# "52°C" or "152°F" With this turned on the display 
+									# "53°C" or "127.4°F" With this turned on the display 
 									# in XTension will instead show 
-									# "52°C (152°F)" or "152°F (52°C)"
+									# "53°C (127.4°F)" or "127.4°F (53°C)"
 									# Note that pi thermal throttling starts around 80°C as of this writing
 
 #
@@ -79,7 +79,7 @@ CPUUsageScanSeconds 	= 10
 # rapid changes that can occur in the course of normal operation keep in mind the XTdb will not record values
 # faster than once a second so it may not be useful to scan faster than that unless you want to 
 
-checkCPUFrequency 		= True
+checkCPUFrequency 		= False
 CPUFrequencyScanSeconds	= 0.2
 
 #

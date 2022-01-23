@@ -16,6 +16,10 @@
 #		protocol. 
 #
 # 	INSTALL:
+#		git is required to do the download of the latest version if you get an error when trying to
+#		run git then you need to install it via:
+#		sudo apt install git
+#
 #		1) copy or rename the configuration_template.py file to "configuration.py"
 #			cp configuration_template.py configuration.py
 #
@@ -135,6 +139,7 @@ currentDiskSpace 	= [0] * len( volumesToScan)
 def threadedFileWatcher():
 	global throttledFile
 
+
 	epoll = select.epoll()
 	
 	CPUCheckCounter 	= CPUTempScanSeconds
@@ -222,8 +227,13 @@ def threadedFileWatcher():
 	
 	
 		
-	
-	
+
+#
+#		P R O C E S S   R S S I
+#
+#	called at the interval in configuration to process the various WiFi statistics
+#	as turned on in the configuration, or nothing if the list of wlan interfaces is empty
+#	
 	
 def processRSSI():
 	global currentRSSI
@@ -291,39 +301,12 @@ def processRSSI():
 			
 
 
-
-
-
-		# address format is "RSSI.WLAN0" so that if we have multiple ones
-		# with different names they can coexist in XTension
-# 		thisAddress = addrRSSI + '.' + thisName
-		
-		# so it turns out that iwlist is not the right thing to use for this
-		# we want the information from iwconfig instead as it is faster and contains only 
-		# our currently connected to device
-	
-# 		process = Popen( ['iwlist', thisName, 'scan'], stdout=PIPE, stderr=PIPE)
-# 		output, _error = process.communicate()
-# 		output = output.decode()
-# 	
-# 		lines = output.split( '\n')
-# 		for s in lines:
-# 			if "Signal level=" in s:
-# 				thisLevel = s.split( 'Signal level=', 2)[1]
-# 				thisLevel = int( thisLevel.split( ' ', 2)[0])
-# 				break
-# 	
-# 		if thisLevel == 255: # an error reading the RSSI or there is no interface currently by this name
-# 			continue
-# 		
-# 		if thisLevel != currentRSSI:
-# 			currentRSSI[ i] = thisLevel
-# 			xtension.sendValue( value=thisLevel, tag=xtension.tagRegister, address=thisAddress)
-# 			print( "RSSI: %s" % theLevel)
-			
-
-
-
+#
+#	P R O C E S S   C P U   T E M P
+#
+#	called at the configured interval by the main watcher thread
+#	opens the CPU temperature "file" and sends any changes to XTension
+#
 
 def processCPUTemp():
 	global currentCPUTemp
@@ -356,10 +339,28 @@ def processCPUTemp():
 		else:
 			xtension.sendValue( value=displayTemp, tag=xtension.tagTemperature, address=addrCPUTEMP, xtKeyDefaultLabel='')
 
+
+#
+#	C   T O   F
+#	
+#	just conversion routine
+#
 def CtoF( inTemp):
 	inTemp = 9.0 / 5.0 * inTemp + 32
 	return round( (inTemp * 10)) / 10
 	
+
+
+#
+#	P R O C E S S   C P U   F R E Q   F I L E
+#
+#	called at the interval in the configuration or not at all if this is turned off
+#	reads the current CPU frequency and sends any changes to XTension
+#	this can change very quickly and so is turned off by default as the scanning must be
+#	multiple times a second to catch very short changes and some may be missed regardless
+#	is useful for debugging purposes or to know how your pi is managing itself but probably not
+#	something you'd want to have streaming constantly all the time.
+#
 
 def processCPUFreqFile():
 	global currentCPUFreq
@@ -389,6 +390,8 @@ def processCPUFreqFile():
 
 	CPUFreqFile.close()
 	
+
+
 
 #
 #		P R O C E S S   T H R O T T L E D   F I L E 
@@ -512,8 +515,16 @@ def processCPUUsage():
 		xtension.sendValue( value=newIdle, tag=xtension.tagRegister, address=addrCPUUsage)
 
 
-# 	function formatBytes(a,b){if(0==a)return"0 Bytes";var c=1024,d=b||2,e=["Bytes","KB","MB","GB","TB","PB","EB","ZB","YB"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(d))+" "+e[f]}
 
+
+
+#
+#	H U M A N   R E A D A B L E   S I Z E
+#
+#	used to format the disk space available into a human readable label that is used as the value
+#	display in XTension. The actual k available is sent as the real unit value but this output
+#	like 16GB or 10MB is sent as the display label to be easier to read.
+#
 def humanReadableSize( size, decimalPlaces = 2):
 	for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
 		if size < 1024.0 or unit == 'PB':
@@ -523,6 +534,13 @@ def humanReadableSize( size, decimalPlaces = 2):
 	formatString = '{:.%sf} {}' % decimalPlaces	
 	return formatString.format( size, unit)
 
+
+#
+#	P R O C E S S   D I S K   S P A C E
+#
+#	called at the interval set in configuration if there is anything in the 
+#	list of volumes to check.
+#
 def processDiskSpace():
 	global currentDiskSpace
 	
@@ -545,6 +563,15 @@ def processDiskSpace():
 		
 
 
+#
+#	R E A D   H O S T N A M E   I N   L I N E
+#
+# 	If a name to use is not included in the configuration file then this is called
+#	to read the hostname of the pi. This will be used in unit naming when creating the
+#	units in XTension.
+#	note that this will not be monitored yet and so if you change the hostname it will not
+#	update until the program is restarted.
+#
 
 def readHostnameInline():
 	global currentHostname
@@ -557,6 +584,13 @@ def readHostnameInline():
 	currentHostname = file.read().strip()
 	file.close
 	
+
+#
+#	G E T   P I   T Y P E
+#
+#	sent as a unit property to the main Status unit. 
+#
+
 def getPiType():
 	try:
 		with open( '/proc/device-tree/model') as f:
@@ -568,6 +602,15 @@ def getPiType():
 		return '(unknown pi type)'
 	
 
+#
+#	G E T   I N F O   F O R   X T E N S I O N
+#
+#	part of the XTension Kits protocol implementation. When an XTension instance finds us it will ask for 
+#	an info packet that describes our units to it so that it can create them. This is a largish JSON file
+#	that we create here based on the configuration. It is called whenever we reconnect to XTension or when
+#	XTension polls us for potentially new information. After this any other changes to the units configured
+#	is pushed to XTension and not polled, but this is loaded periodically.
+#
 
 def getInfoForXTension():
 
@@ -653,12 +696,11 @@ def getInfoForXTension():
 			units += [{kInfoName:'Disk Space: %s' % thisPath, kInfoTag:xtension.tagRegister, 
 				kInfoAddress:thisAddress, kInfoDimmable:True, kInfoReceiveOnly:True, kInfoIgnoreClicks:True}]
 				
-				
 
-	
 	work[ 'units'] = units
 	
 	# additional properties for the master unit
+	# NOTE this is not yet implemented in the XTension kit plugin, but I'll get that working shortly
 	work[ 'mainprops'] = [
 		{'pi type':piType}
 	]
@@ -667,8 +709,14 @@ def getInfoForXTension():
 	
 
 
-# if the user has not set it then we will do so from the machine hostname
 
+
+
+#
+#		M A I N
+#
+
+# if the user has not set it then we will do so from the machine hostname
 if currentHostname == None:
 	readHostnameInline()
 
@@ -682,21 +730,36 @@ xtension.startup()
 # give it a moment to actually find XTension so that initial values can be sent
 sleep( 2)
 
-print( "starting watcher threads")
 
-# this is now handled inline with the regular fileWatcherThread so less threads needed
-# secondaryWatcherThread = Thread( target=nonSelectFileThread, args=())
-# secondaryWatcherThread.start()
+# before beginning the watching of the file make sure that the historical throttled units
+# are off. If they turn out to be on as soon as we begin reading the file then they will
+# be turned on again. But since we cannot reliably read a 0 for nothing we cannot reliably 
+# send an off for these. They are normally only reset by a reboot so when this program starts we send them
+# an off.
+
+xtension.sendCommandToAll( XTPCommand( command=xtension.xtPCommandData, jsonData=
+	{xtKeyCommand:xtCommandOff, xtKeyTag:xtension.tagDiscreteRegister, xtKeyAddress:addrThrottledHistoric, xtKeyUpdateOnly:True}
+))
+xtension.sendCommandToAll( XTPCommand( command=xtension.xtPCommandData, jsonData=
+	{xtKeyCommand:xtCommandOff, xtKeyTag:xtension.tagDiscreteRegister, xtKeyAddress:addrCappedHistoric, xtKeyUpdateOnly:True}
+))
+xtension.sendCommandToAll( XTPCommand( command=xtension.xtPCommandData, jsonData=
+	{xtKeyCommand:xtCommandOff, xtKeyTag:xtension.tagDiscreteRegister, xtKeyAddress:addrUndervoltHistoric, xtKeyUpdateOnly:True}
+))
+
 
 
 fileWatcherThread = Thread( target=threadedFileWatcher, args=())
 fileWatcherThread.start()
 
+#
+# if the CPU Frequency check is enabled this will run in a separate thread from the main watcher thread as it needs to
+# scan must more rapidly than the resolution of the main watcher system.
 if checkCPUFrequency:
 	CPUSpeedThread = Thread( target=processCPUFreqFile, args=())
 	CPUSpeedThread.start()
 
-print( "hostname is: %s" % currentHostname)
+xtension.writeLog( "PiMonitor Startup")
 
 
 	
