@@ -60,6 +60,9 @@ units with the appropriate names will be created in XTension rather than potenti
 To run the program automatically at startup we need to register it with the systemctl system. The service file is included with the distribution and is called
 `pimonitor.service` If you have changed the default install location from the default of `/home/pi/pimonitor/pimonitor.py` you will need to edit this 
 file to point to the new location. If not you can use it as given. Skip the last step to start the program if you have not yet edited the configuration file. 
+
+**NOTE:** If you are using the newest Raspberry Pi versions you may be asked during its setup to create a user name other than the old standard of "pi". If you use a different user name then you must edit the pimonitor.service file before installing so that it points to the proper install location. This could be fixed by installing the program into one of the appropriate places for such things but until that just edit that path in the file to include the user name you created instead of pi.
+
 From inside the pimonitor directory run the following commands:
 
 ```
