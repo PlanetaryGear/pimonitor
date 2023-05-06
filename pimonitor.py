@@ -87,6 +87,8 @@ except:
 
 
 
+pluginVersion = '1.0.1'
+
 
 
 # addresses used for normal units 
@@ -764,7 +766,7 @@ if checkCPUFrequency:
 	CPUSpeedThread = Thread( target=processCPUFreqFile, args=())
 	CPUSpeedThread.start()
 
-xtension.writeLog( "PiMonitor Startup")
+xtension.writeLog( "Pi Monitor v{pluginVersion} Starting Up")
 
 
 	
