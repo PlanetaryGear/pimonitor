@@ -22,6 +22,7 @@ kInfoOnLabel			= 'onlabel'			# optional
 kInfoOffLabel			= 'offlabel'		# optional
 kInfoIgnoreClicks		= 'ignoreclicks'	# optional
 kInfoReceiveOnly		= 'receiveonly'		# optional
+kInfoNoLog 				= 'nolog'			# optional send with units you wish to be created with the dontLogNewValueReceptions flag set
 kInfoAllowColor			= 'allowcolor'		# optional can come from tag info if defined
 kInfoAllowColorTemp		= 'allowcolortemp'	# optional can come from tag info if defined
 kInfoDimmable			= 'dimmable'		# optional can come from tag info if defined

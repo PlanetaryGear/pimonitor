@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 #
 #			Raspberry Pi Monitor for XTension
-#		c. 2022 by James Sentman james@sentman.com
+#		c. 2022-2023 by James Sentman james@sentman.com
 #		https://MacHomeAutomation.com/
 #
 #	this background program will connect to XTension and create units for the health of this
@@ -37,6 +37,13 @@
 #			sudo systemctl enable pimonitor
 #			sudo systemctl start pimonitor
 #
+# Version info:
+#	1.0 	Initial Release
+#
+#	1.0.1 	5/6/2023 	Added dont log new value receptions to the new unit creations for 
+#						much of the data that changes frequently but is not necessarily
+#						useful to have spamming the log as the values will be there to go
+#						look for if needed.
 
 
 import select
@@ -256,7 +263,6 @@ def processRSSI():
 				if value != currentWiFiFrequency[ i]:
 					currentWiFiFrequency[ i] = value
 					thisAddress = addrWiFiFreq + '.' + thisName
-					#print( "%s Freq: %s" % ( thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 			
 			if checkRSSI and 'Signal level=' in workLine:
@@ -265,7 +271,6 @@ def processRSSI():
 				if value != currentRSSI[ i]:
 					thisAddress = addrRSSI + '.' + thisName
 					currentRSSI[ i] = value
-					#print( "%s RSSI: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 					
 			if showBitRate and 'Bit Rate=' in workLine:
@@ -274,7 +279,6 @@ def processRSSI():
 				if value != currentBitRate[ i]:
 					thisAddress = addrLinkRate + '.' + thisName
 					currentBitRate[ i] = value
-					#print( "%s BitRate: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 					
 			if showTXPower and 'Tx-Power=' in workLine:
@@ -283,7 +287,6 @@ def processRSSI():
 				if value != currentTXPower[ i]:
 					currentTXPower[ i] = value
 					thisAddress = addrTXPower + '.' + thisName
-					#print( "%s TX Power: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 					
 			if showLinkQuality and 'Link Quality=' in workLine:
@@ -293,7 +296,6 @@ def processRSSI():
 				if value != currentQuality[ i]:
 					currentQuality[ i] = value
 					thisAddress = addrLinkQuality + '.' + thisName
-					#print( "%s Quality: %s" % (thisAddress, value))
 					xtension.sendValue( value=value, tag=xtension.tagRegister, address=thisAddress, keyUpdateOnly=True)
 			
 				
@@ -611,6 +613,9 @@ def getPiType():
 #	XTension polls us for potentially new information. After this any other changes to the units configured
 #	is pushed to XTension and not polled, but this is loaded periodically.
 #
+#	1.0.1 added the kInfoNoLog flag to the creation of units that change frequently but for which it might not
+#	be useful to have it log constantly like CPU Usage and CPU Temp. You can turn this back on in the Advanced
+#	tab of the Edit Unit dialog in XTension.
 
 def getInfoForXTension():
 
@@ -641,14 +646,14 @@ def getInfoForXTension():
 	
 	if checkCPUTemp:
 		units += [{kInfoName:'CPU Temperature', kInfoTag:xtension.tagTemperature, kInfoAddress:addrCPUTEMP, 
-			kInfoDimmable:True, kInfoSuffix:'°F', kInfoIgnoreClicks:True, kInfoReceiveOnly:True,}]
+			kInfoDimmable:True, kInfoSuffix:'°F', kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoNoLog:True}]
 			
 	if checkRSSI:
 		for thisInterface in RSSIInterfaceName:
 			thisName = 'WiFi RSSI ' + thisInterface
 			thisAddress = addrRSSI + '.' + thisInterface
 			units += [{kInfoName:thisName, kInfoTag:xtension.tagRegister, kInfoAddress:thisAddress, 
-				kInfoDimmable:True, kInfoSuffix:' dBm', kInfoIgnoreClicks:True, kInfoReceiveOnly:True}]
+				kInfoDimmable:True, kInfoSuffix:' dBm', kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoNoLog:True}]
 				
 	if showBitRate:
 		for thisInterface in RSSIInterfaceName:
@@ -656,7 +661,7 @@ def getInfoForXTension():
 			thisAddress = addrLinkRate + '.' + thisInterface
 			
 			units += [{kInfoName:thisName, kInfoTag:xtension.tagRegister, kInfoAddress:thisAddress, 
-				kInfoDimmable:True, kInfoSuffix:' Mb/s', kInfoIgnoreClicks:True, kInfoReceiveOnly:True}]
+				kInfoDimmable:True, kInfoSuffix:' Mb/s', kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoNoLog:True}]
 				
 	if showTXPower:
 		for thisInterface in RSSIInterfaceName:
@@ -664,7 +669,7 @@ def getInfoForXTension():
 			thisAddress = addrTXPower + '.' + thisInterface
 
 			units += [{kInfoName:thisName, kInfoTag:xtension.tagRegister, kInfoAddress:thisAddress, 
-				kInfoDimmable:True, kInfoSuffix:' dBm', kInfoIgnoreClicks:True, kInfoReceiveOnly:True}]
+				kInfoDimmable:True, kInfoSuffix:' dBm', kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoNoLog:True}]
 				
 	if showLinkQuality:
 		for thisInterface in RSSIInterfaceName:
@@ -672,7 +677,7 @@ def getInfoForXTension():
 			thisAddress = addrLinkQuality + '.' + thisInterface
 
 			units += [{kInfoName:thisName, kInfoTag:xtension.tagRegister, kInfoAddress:thisAddress, 
-				kInfoDimmable:True, kInfoSuffix:'%', kInfoIgnoreClicks:True, kInfoReceiveOnly:True}]
+				kInfoDimmable:True, kInfoSuffix:'%', kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoNoLog:True}]
 	
 	if showWiFiFrequency:
 		for thisInterface in RSSIInterfaceName:
@@ -684,17 +689,17 @@ def getInfoForXTension():
 
 	if checkCPUUsage:
 		units += [{kInfoName:'CPU Idle', kInfoTag:xtension.tagRegister, kInfoAddress:addrCPUUsage, 
-			kInfoDimmable:True, kInfoSuffix:'%', kInfoIgnoreClicks:True, kInfoReceiveOnly:True}]
+			kInfoDimmable:True, kInfoSuffix:'%', kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoNoLog:True}]
 			
 	if checkCPUFrequency:
 		units += [{kInfoName:'CPU Frequency', kInfoTag:xtension.tagRegister, kInfoAddress:addrFrequency, 
-			kInfoDimmable:True,	kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoSuffix:' MHz'}]
+			kInfoDimmable:True,	kInfoIgnoreClicks:True, kInfoReceiveOnly:True, kInfoSuffix:' MHz', kInfoNoLog:True}]
 			
 	if checkDiskSpace:
 		for thisPath in volumesToScan:
 			thisAddress = addrDiskSpace + '.' + thisPath.replace( '/', '.')
 			units += [{kInfoName:'Disk Space: %s' % thisPath, kInfoTag:xtension.tagRegister, 
-				kInfoAddress:thisAddress, kInfoDimmable:True, kInfoReceiveOnly:True, kInfoIgnoreClicks:True}]
+				kInfoAddress:thisAddress, kInfoDimmable:True, kInfoReceiveOnly:True, kInfoIgnoreClicks:True, kInfoNoLog:True}]
 				
 
 	work[ 'units'] = units
